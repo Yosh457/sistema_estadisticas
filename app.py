@@ -6,6 +6,7 @@ from extensions import login_manager, csrf
 
 def create_app():
     app = Flask(__name__)
+    app.jinja_env.add_extension('jinja2.ext.do')
     load_dotenv()
 
     # Configuración
@@ -21,13 +22,17 @@ def create_app():
     
     login_manager.login_view = 'auth.login'
 
-    # Aquí registraremos los blueprints pronto
-    # from blueprints.auth import auth_bp
-    # app.register_blueprint(auth_bp)
+    # --- REGISTRO DE BLUEPRINTS ---
+    from blueprints.auth import auth_bp 
+    app.register_blueprint(auth_bp)
 
+    from blueprints.admin import admin_bp
+    app.register_blueprint(admin_bp)
+
+    # --- RUTAS GLOBALES ---
     @app.route('/')
     def index():
-        return "Sistema de Estadísticas Activo - Falta configurar Login"
+        return redirect(url_for('auth.login')) # Redirigimos al login
 
     return app
 
