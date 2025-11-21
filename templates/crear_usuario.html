@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Crear Nuevo Usuario{% endblock %}
+
+{% block content %}
+<div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-4xl mx-auto my-12">
+    <div class="border-b pb-4 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">Crear Nuevo Usuario</h2>
+        <p class="text-gray-500 text-sm mt-1">Ingresa los datos básicos para el acceso al panel.</p>
+    </div>
+
+    <form method="post" class="space-y-8">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="space-y-6">
+                <div>
+                    <label for="nombre_completo" class="block text-sm font-medium text-gray-700">Nombre Completo</label>
+                    <input type="text" name="nombre_completo" id="nombre_completo" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Ej: Juan Pérez" required>
+                </div>
+                
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">Correo Electrónico</label>
+                    <input type="email" name="email" id="email" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="ejemplo@estadisticas.cl" required>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div>
+                    <label for="rol_id" class="block text-sm font-medium text-gray-700">Rol de Sistema</label>
+                    <select name="rol_id" id="rol_id" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" required>
+                        <option value="" disabled selected>Selecciona un rol</option>
+                        {% for rol in roles %}
+                            <option value="{{ rol.id }}">{{ rol.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Contraseña Provisional</label>
+                    <input type="password" name="password" id="password" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" required>
+                </div>
+
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="flex items-start">
+                        <div class="flex items-center h-5">
+                            <input type="checkbox" name="forzar_cambio_clave" value="1" id="forzar_cambio_clave" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        </div>
+                        <div class="ml-3 text-sm">
+                            <label for="forzar_cambio_clave" class="font-medium text-gray-700">Forzar cambio de contraseña</label>
+                            <p class="text-gray-500">El usuario deberá cambiar su clave al iniciar sesión por primera vez.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-4 pt-6 border-t mt-8">
+            <a href="{{ url_for('admin.panel') }}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition">Crear Usuario</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

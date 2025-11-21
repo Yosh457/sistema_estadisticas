@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Editar Usuario{% endblock %}
+
+{% block content %}
+<div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-4xl mx-auto my-12">
+    
+    <div class="border-b pb-4 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">
+            Editando a: <span class="text-blue-600">{{ usuario.nombre_completo }}</span>
+        </h2>
+        <p class="text-gray-500 text-sm mt-1">Modifica los datos del usuario o actualiza su contraseña.</p>
+    </div>
+
+    <form id="edit-user-form" method="post" class="space-y-8">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            <div class="space-y-6">
+                <div>
+                    <label for="nombre_completo" class="block text-sm font-medium text-gray-700">Nombre Completo</label>
+                    <input type="text" name="nombre_completo" value="{{ usuario.nombre_completo }}" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                </div>
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">Correo Electrónico</label>
+                    <input type="email" name="email" value="{{ usuario.email }}" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div>
+                    <label for="rol_id" class="block text-sm font-medium text-gray-700">Rol</label>
+                    <select name="rol_id" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                        {% for rol in roles %}
+                            <option value="{{ rol.id }}" {% if rol.id == usuario.rol_id %}selected{% endif %}>
+                                {{ rol.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Nueva Contraseña</label>
+                    <input type="password" name="password" placeholder="Dejar en blanco para mantener la actual" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    <p class="text-xs text-gray-500 mt-1">Solo llena este campo si deseas cambiar la clave del usuario.</p>
+                </div>
+
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="flex items-start">
+                        <div class="flex items-center h-5">
+                            <input type="checkbox" name="forzar_cambio_clave" value="1" id="forzar_cambio_clave" 
+                                   class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                   {% if usuario.cambio_clave_requerido %}checked{% endif %}>
+                        </div>
+                        <div class="ml-3 text-sm">
+                            <label for="forzar_cambio_clave" class="font-medium text-gray-700">Forzar cambio de contraseña</label>
+                            <p class="text-gray-500">El usuario deberá cambiar su clave al próximo inicio.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-4 pt-6 border-t mt-8">
+            <a href="{{ url_for('admin.panel') }}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary shadow-md hover:shadow-lg">Guardar Cambios</button>
+        </div>
+    </form>
+</div>
+
+<div id="confirmation-modal" class="fixed inset-0 z-50 items-center justify-center hidden bg-black bg-opacity-50 backdrop-blur-sm">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 m-4 text-center transform transition-all scale-100">
+        
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
+            <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Confirmar Cambios</h3>
+        <p class="text-sm text-gray-600 mb-6">
+            Estás a punto de modificar los datos de <strong>{{ usuario.nombre_completo }}</strong>. <br>¿Deseas continuar?
+        </p>
+        
+        <div class="flex justify-center gap-3">
+            <button id="cancel-save" class="btn btn-secondary">Cancelar</button>
+            <button id="confirm-save" class="btn btn-primary">Sí, Guardar</button>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='modal_handler.js') }}"></script>
+{% endblock %}
