@@ -100,12 +100,6 @@ def crear_usuario():
     roles = Rol.query.order_by(Rol.nombre).all()
     return render_template('crear_usuario.html', roles=roles)
 
-@admin_bp.route('/ver_logs')
-@login_required
-def ver_logs():
-    flash('Funcionalidad en construcción', 'info')
-    return redirect(url_for('admin.panel'))
-
 @admin_bp.route('/editar_usuario/<int:id>', methods=['GET', 'POST'])
 @login_required
 def editar_usuario(id):
@@ -169,6 +163,51 @@ def toggle_activo(id):
         accion="Cambio de Estado",
         detalles=f"Usuario {usuario.nombre_completo} fue {estado}."
     )
-    
+
     flash(f'Usuario {usuario.nombre_completo} {estado}.', 'success')
     return redirect(url_for('admin.panel'))
+
+@admin_bp.route('/ver_logs')
+@login_required
+def ver_logs():
+    page = request.args.get('page', 1, type=int)
+    
+    # Capturamos los filtros de la URL
+    usuario_filtro_id = request.args.get('usuario_id', '')
+    accion_filtro = request.args.get('accion', '')
+
+    # Ordenamos por fecha descendente (lo más nuevo primero)
+    query = Log.query.order_by(Log.timestamp.desc())
+
+    # Aplicamos filtros si existen
+    if usuario_filtro_id:
+        query = query.filter(Log.usuario_id == usuario_filtro_id)
+    if accion_filtro:
+        query = query.filter(Log.accion == accion_filtro)
+        
+    # Paginación
+    pagination = query.paginate(page=page, per_page=15, error_out=False)
+    
+    # Datos para los selectores (Dropdowns)
+    todos_los_usuarios = Usuario.query.order_by(Usuario.nombre_completo).all()
+    
+    # Lista manual de las acciones que hemos programado en este sistema
+    acciones_posibles = [
+        "Inicio de Sesión",
+        "Cierre de Sesión",
+        "Creación de Usuario",
+        "Edición de Usuario",
+        "Cambio de Estado" # (Activar/Desactivar)
+    ]
+    
+    # Pasamos los filtros actuales para mantener seleccionada la opción en el HTML
+    filtros_actuales = {
+        'usuario_id': usuario_filtro_id,
+        'accion': accion_filtro
+    }
+
+    return render_template('ver_logs.html',
+                        pagination=pagination,
+                        todos_los_usuarios=todos_los_usuarios,
+                        acciones_posibles=acciones_posibles,
+                        filtros=filtros_actuales)

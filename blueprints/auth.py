@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from models import db, Usuario
+from utils import registrar_log
 
 auth_bp = Blueprint('auth', __name__, template_folder='../templates')
 
@@ -24,6 +25,10 @@ def login():
                 return redirect(url_for('auth.login'))
             
             login_user(usuario)
+            registrar_log(
+                accion="Inicio de Sesión", 
+                detalles=f"Usuario {usuario.nombre_completo} (ID: {usuario.id}) inició sesión."
+            )
             flash(f'Bienvenido, {usuario.nombre_completo}', 'success')
             
             # Aquí definiremos a dónde va cada rol más adelante. 
@@ -37,6 +42,10 @@ def login():
 @auth_bp.route('/logout')
 @login_required
 def logout():
+    registrar_log(
+        accion="Cierre de Sesión", 
+        detalles=f"Usuario {current_user.nombre_completo} (ID: {current_user.id}) cerró sesión."
+    )
     logout_user()
     flash('Has cerrado sesión correctamente.', 'success')
     return redirect(url_for('auth.login'))
