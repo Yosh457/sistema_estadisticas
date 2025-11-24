@@ -50,3 +50,29 @@ class Log(db.Model):
     detalles = db.Column(db.Text)
     
     usuario = db.relationship('Usuario', backref=db.backref('logs', lazy=True))
+
+# --- MODELOS ESTADÍSTICAS ---
+
+class Grupo(db.Model):
+    __tablename__ = 'grupos'
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False)
+    imagen = db.Column(db.String(255)) 
+    orden = db.Column(db.Integer, default=0)
+    
+    # Relación para acceder a los dashboards de este grupo
+    dashboards = db.relationship('Dashboard', back_populates='grupo')
+
+class Dashboard(db.Model):
+    __tablename__ = 'dashboards'
+    id = db.Column(db.Integer, primary_key=True)
+    titulo = db.Column(db.String(255), nullable=False)
+    descripcion = db.Column(db.Text)
+    url_iframe = db.Column(db.Text, nullable=False) # Aquí va el link de Power BI
+    imagen_preview = db.Column(db.String(255)) # Nombre del archivo en static (ej: dashboard1.png)
+    activo = db.Column(db.Boolean, default=True)
+    orden = db.Column(db.Integer, default=0) # Para controlar cuál sale primero
+
+    # Llave foránea para saber a qué grupo pertenece
+    grupo_id = db.Column(db.Integer, db.ForeignKey('grupos.id'), nullable=True)
+    grupo = db.relationship('Grupo', back_populates='dashboards')

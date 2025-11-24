@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Selección de Área{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto py-12 px-4">
+    
+    <div class="flex justify-between items-center mb-12 border-b pb-4">
+        <div>
+            <h2 class="text-3xl font-bold text-gray-900">Paneles Estadísticos</h2>
+            <p class="mt-1 text-gray-500">Selecciona un área para ver sus indicadores</p>
+        </div>
+        <div class="flex items-center gap-4">
+            <span class="text-sm text-gray-600 hidden sm:inline">Hola, <strong>{{ current_user.nombre_completo }}</strong></span>
+            <a href="{{ url_for('auth.logout') }}" 
+               class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition shadow-sm">
+               <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+               </svg>
+               Cerrar Sesión
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+        {% for grupo in grupos %}
+        <a href="{{ url_for('estadisticas.lista_por_grupo', grupo_id=grupo.id) }}" 
+           class="group bg-white rounded-xl shadow-md hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden border border-gray-100 flex flex-col h-64">
+            
+            <div class="h-3/4 bg-gray-50 flex items-center justify-center p-6 group-hover:bg-blue-50 transition-colors duration-300">
+                <img src="{{ url_for('static', filename=grupo.imagen) if grupo.imagen else url_for('static', filename='logoMaho.png') }}" 
+                     alt="{{ grupo.nombre }}" 
+                     class="h-48 w-48 object-contain opacity-90 group-hover:opacity-100 transition-transform duration-300 transform group-hover:scale-110">
+            </div>
+
+            <div class="h-1/4 flex items-center justify-center bg-white border-t border-gray-100 relative">
+                <span class="font-bold text-gray-700 uppercase tracking-wide text-sm group-hover:text-blue-600 transition-colors">
+                    {{ grupo.nombre }}
+                </span>
+                <div class="absolute bottom-0 left-0 w-full h-1 bg-blue-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

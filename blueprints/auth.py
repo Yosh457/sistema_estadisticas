@@ -13,17 +13,18 @@ auth_bp = Blueprint('auth', __name__, template_folder='../templates')
 # --- Lógica de Redirección ---
 def obtener_ruta_redireccion(usuario):
     """Define a dónde va el usuario según su Rol."""
+    if not usuario.rol:
+        return url_for('auth.login')
+    
     nombre_rol = usuario.rol.nombre
     
     if nombre_rol == "Admin":
         return url_for('admin.panel')
     elif nombre_rol == "Lector":
-        # Cuando creemos el dashboard, apuntaremos aquí.
-        # Por ahora, un placeholder o el mismo admin panel si quieres probar.
-        # return url_for('estadisticas.dashboard') 
-        return url_for('admin.panel') # Temporal para que no de error 404
+        # CORRECCIÓN: Ahora los lectores van a la selección de grupos
+        return url_for('estadisticas.seleccion_grupo')
     else:
-        return url_for('admin.panel')
+        return url_for('estadisticas.seleccion_grupo')
 
 # --- RUTAS DE LOGIN/LOGOUT ---
 @auth_bp.route('/login', methods=['GET', 'POST'])
