@@ -29,6 +29,9 @@ def create_app():
     from blueprints.admin import admin_bp
     app.register_blueprint(admin_bp)
 
+    from blueprints.estadisticas import estadisticas_bp
+    app.register_blueprint(estadisticas_bp)
+
     # --- RUTAS GLOBALES ---
     @app.route('/')
     def index():
