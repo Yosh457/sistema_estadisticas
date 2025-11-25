@@ -26,7 +26,7 @@
             <div id="panel-{{ dash.id }}" class="hidden border-t border-gray-100 bg-white">
                 <div class="p-6 flex flex-col md:flex-row gap-6">
                     <div class="md:w-1/2 flex flex-col justify-between">
-                        <p class="text-gray-600 text-justify mb-4">{{ dash.descripcion }}</p>
+                        <p class="text-gray-600 text-justify mb-4">{{ dash.descripcion | safe }}</p>
                         <a href="{{ url_for('estadisticas.ver_dashboard', id=dash.id) }}" 
                            class="btn btn-primary w-full md:w-auto text-center">
                             Ingresar aquí
@@ -35,7 +35,7 @@
                     <div class="md:w-1/2">
                         <img src="{{ url_for('static', filename=dash.imagen_preview) if dash.imagen_preview else url_for('static', filename='logoMaho.png') }}" 
                              alt="Vista previa" 
-                             class="rounded-lg shadow-md w-full object-cover h-48">
+                             class="rounded-lg shadow-md w-full object-cover h-60">
                     </div>
                 </div>
             </div>

@@ -3,6 +3,7 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
 from functools import wraps
 from flask import abort, redirect, url_for, flash
 from flask_login import current_user
@@ -39,7 +40,11 @@ def enviar_correo_reseteo(usuario, token):
 
     msg = MIMEMultipart()
     msg['Subject'] = 'Restablecimiento de Contraseña - Sistema Estadísticas'
-    msg['From'] = f"Sistema Estadísticas <{remitente}>"
+    
+    # 2. CAMBIO AQUÍ: Usamos formataddr en lugar de f-string manual
+    # Esto genera un header estándar RFC 2822 que los clientes respetan más
+    msg['From'] = formataddr(('Sistema Estadísticas', remitente))
+    
     msg['To'] = usuario.email
 
     # Generamos el link apuntando a la ruta de auth
