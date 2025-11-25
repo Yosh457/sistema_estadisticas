@@ -26,7 +26,9 @@
             <div id="panel-{{ dash.id }}" class="hidden border-t border-gray-100 bg-white">
                 <div class="p-6 flex flex-col md:flex-row gap-6">
                     <div class="md:w-1/2 flex flex-col justify-between">
-                        <p class="text-gray-600 text-justify mb-4">{{ dash.descripcion | safe }}</p>
+                        <div class="text-gray-600 text-justify mb-4">
+                            {{ dash.descripcion | safe }}
+                        </div>
                         <a href="{{ url_for('estadisticas.ver_dashboard', id=dash.id) }}" 
                            class="btn btn-primary w-full md:w-auto text-center">
                             Ingresar aquí
