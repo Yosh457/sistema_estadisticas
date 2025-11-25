@@ -1,10 +1,12 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+import os
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from werkzeug.security import generate_password_hash
+from werkzeug.utils import secure_filename
 from datetime import datetime
-from models import db, Usuario, Rol, Log
-from utils import registrar_log
+from models import db, Usuario, Rol, Log, Dashboard, Grupo
+from utils import registrar_log, admin_required
 
 admin_bp = Blueprint('admin', __name__, template_folder='../templates', url_prefix='/admin')
 
@@ -211,3 +213,92 @@ def ver_logs():
                         todos_los_usuarios=todos_los_usuarios,
                         acciones_posibles=acciones_posibles,
                         filtros=filtros_actuales)
+
+# --- GESTIÓN DE DASHBOARDS ---
+
+@admin_bp.route('/dashboards')
+@login_required
+@admin_required
+def admin_dashboards():
+    dashboards = Dashboard.query.order_by(Dashboard.grupo_id, Dashboard.orden).all()
+    return render_template('admin_dashboards.html', dashboards=dashboards)
+
+@admin_bp.route('/crear_dashboard', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def crear_dashboard():
+    if request.method == 'POST':
+        titulo = request.form.get('titulo')
+        descripcion = request.form.get('descripcion')
+        url_iframe = request.form.get('url_iframe')
+        grupo_id = request.form.get('grupo_id')
+        orden = request.form.get('orden')
+        
+        # Manejo de Imagen
+        imagen_filename = None
+        if 'imagen' in request.files:
+            file = request.files['imagen']
+            if file and file.filename != '':
+                filename = secure_filename(file.filename)
+                # Guardamos en static
+                file.save(os.path.join(current_app.root_path, 'static', filename))
+                imagen_filename = filename
+
+        nuevo_dash = Dashboard(
+            titulo=titulo,
+            descripcion=descripcion,
+            url_iframe=url_iframe,
+            grupo_id=grupo_id,
+            orden=orden,
+            imagen_preview=imagen_filename,
+            activo=True
+        )
+        
+        db.session.add(nuevo_dash)
+        db.session.commit()
+        
+        registrar_log("Creación Dashboard", f"Creó el dashboard '{titulo}'")
+        flash('Dashboard creado con éxito.', 'success')
+        return redirect(url_for('admin.admin_dashboards'))
+
+    grupos = Grupo.query.order_by(Grupo.orden).all()
+    return render_template('crear_editar_dashboard.html', grupos=grupos, dashboard=None)
+
+@admin_bp.route('/editar_dashboard/<int:id>', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def editar_dashboard(id):
+    dashboard = Dashboard.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        dashboard.titulo = request.form.get('titulo')
+        dashboard.descripcion = request.form.get('descripcion')
+        dashboard.url_iframe = request.form.get('url_iframe')
+        dashboard.grupo_id = request.form.get('grupo_id')
+        dashboard.orden = request.form.get('orden')
+        
+        # Manejo de Imagen (Solo si se sube una nueva)
+        if 'imagen' in request.files:
+            file = request.files['imagen']
+            if file and file.filename != '':
+                filename = secure_filename(file.filename)
+                file.save(os.path.join(current_app.root_path, 'static', filename))
+                dashboard.imagen_preview = filename
+
+        db.session.commit()
+        registrar_log("Edición Dashboard", f"Editó el dashboard '{dashboard.titulo}'")
+        flash('Dashboard actualizado.', 'success')
+        return redirect(url_for('admin.admin_dashboards'))
+
+    grupos = Grupo.query.order_by(Grupo.orden).all()
+    return render_template('crear_editar_dashboard.html', grupos=grupos, dashboard=dashboard)
+
+@admin_bp.route('/toggle_dashboard/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def toggle_dashboard(id):
+    dashboard = Dashboard.query.get_or_404(id)
+    dashboard.activo = not dashboard.activo
+    db.session.commit()
+    flash(f'Dashboard "{dashboard.titulo}" {"activado" if dashboard.activo else "desactivado"}.', 'info')
+    return redirect(url_for('admin.admin_dashboards'))

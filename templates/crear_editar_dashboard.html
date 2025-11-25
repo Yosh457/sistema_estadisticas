@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if dashboard else 'Crear' }} Panel{% endblock %}
+
+{% block content %}
+<div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-4xl mx-auto my-12">
+    <div class="border-b pb-4 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">{{ 'Editar' if dashboard else 'Crear Nuevo' }} Panel</h2>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <div class="col-span-2">
+                <label class="block text-sm font-medium text-gray-700">Título del Panel</label>
+                <input type="text" name="titulo" value="{{ dashboard.titulo if dashboard else '' }}" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg" required>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Grupo</label>
+                <select name="grupo_id" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg" required>
+                    {% for grupo in grupos %}
+                        <option value="{{ grupo.id }}" {% if dashboard and dashboard.grupo_id == grupo.id %}selected{% endif %}>
+                            {{ grupo.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Orden (Posición)</label>
+                <input type="number" name="orden" value="{{ dashboard.orden if dashboard else 0 }}" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg">
+            </div>
+
+            <div class="col-span-2">
+                <label class="block text-sm font-medium text-gray-700">Descripción (Soporta HTML)</label>
+                <textarea name="descripcion" rows="4" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg">{{ dashboard.descripcion if dashboard else '' }}</textarea>
+                <p class="text-xs text-gray-500 mt-1">Puedes usar &lt;br&gt; para saltos de línea o &lt;b&gt; para negrita.</p>
+            </div>
+
+            <div class="col-span-2">
+                <label class="block text-sm font-medium text-gray-700">Link Power BI (Embed URL)</label>
+                <input type="text" name="url_iframe" value="{{ dashboard.url_iframe if dashboard else '' }}" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg" required>
+            </div>
+
+            <div class="col-span-2">
+                <label class="block text-sm font-medium text-gray-700">Imagen de Vista Previa</label>
+                {% if dashboard and dashboard.imagen_preview %}
+                    <p class="text-sm text-blue-600 mb-2">Imagen actual: {{ dashboard.imagen_preview }}</p>
+                {% endif %}
+                <input type="file" name="imagen" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg">
+                <p class="text-xs text-gray-500 mt-1">Sube una nueva imagen solo si quieres reemplazar la actual.</p>
+            </div>
+
+        </div>
+
+        <div class="flex justify-end gap-4 pt-6 border-t mt-8">
+            <a href="{{ url_for('admin.admin_dashboards') }}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Guardar Panel</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
