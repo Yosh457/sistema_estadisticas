@@ -59,9 +59,16 @@ def panel():
 
 # --- RUTAS PANEL DE ADMIN ---
 
+# --- GESTIÓN DE USUARIOS ---
 @admin_bp.route('/crear_usuario', methods=['GET', 'POST'])
 @login_required
 def crear_usuario():
+    # Obtenemos listas para los permisos
+    todos_grupos = Grupo.query.order_by(Grupo.orden).all()
+    todos_dashboards = Dashboard.query.order_by(Dashboard.grupo_id, Dashboard.orden).all()
+    roles = Rol.query.order_by(Rol.nombre).all()
+
+    # POST: Procesar formulario
     if request.method == 'POST':
         nombre = request.form.get('nombre_completo')
         email = request.form.get('email')
@@ -71,10 +78,23 @@ def crear_usuario():
         # Checkbox devuelve '1' si está marcado, o nada si no
         forzar_cambio = request.form.get('forzar_cambio_clave') == '1'
 
-        # 1. Validaciones
+        # 1. VALIDACIÓN: Correo Duplicado
         if Usuario.query.filter_by(email=email).first():
-            flash('El correo electrónico ya está registrado.', 'danger')
-            return redirect(url_for('admin.crear_usuario'))
+            flash('Error: El correo electrónico ya está registrado en el sistema.', 'danger')
+            # Guardamos lo que el usuario escribió para devolverlo
+            datos_previos = {
+                'nombre_completo': nombre,
+                'email': email,
+                'rol_id': int(rol_id) if rol_id else None,
+                'permisos_grupos': [int(x) for x in request.form.getlist('permisos_grupos')], # Lista de IDs
+                'permisos_dashboards': [int(x) for x in request.form.getlist('permisos_dashboards')]
+            }
+            
+            return render_template('crear_usuario.html', 
+                                   roles=roles, 
+                                   grupos=todos_grupos, 
+                                   dashboards=todos_dashboards,
+                                   datos_previos=datos_previos)
 
         # 2. Crear Usuario
         nuevo_usuario = Usuario(
@@ -86,65 +106,90 @@ def crear_usuario():
         )
         nuevo_usuario.set_password(password)
         
-        db.session.add(nuevo_usuario)
-        db.session.commit()
+        # 3. ASIGNAR PERMISOS (Solo si es rol Lector, aunque el admin ve todo por defecto en el código)
+        grupos_ids = request.form.getlist('permisos_grupos')
+        dashboards_ids = request.form.getlist('permisos_dashboards')
 
-        # 3. Registrar Log
-        registrar_log(
-            accion="Creación de Usuario",
-            detalles=f"Creó al usuario {nombre} ({email})"
-        )
+        for gid in grupos_ids:
+            grupo = Grupo.query.get(int(gid))
+            if grupo: nuevo_usuario.grupos_permitidos.append(grupo)
+        
+        for did in dashboards_ids:
+            dash = Dashboard.query.get(int(did))
+            if dash: nuevo_usuario.dashboards_permitidos.append(dash)
+        
+        try:
+            db.session.add(nuevo_usuario)
+            db.session.commit()
 
-        flash('Usuario creado con éxito.', 'success')
-        return redirect(url_for('admin.panel'))
+            registrar_log("Creación de Usuario", f"Creó al usuario {nombre} ({email}) con permisos asignados.")
+            flash('Usuario creado con éxito.', 'success')
+            return redirect(url_for('admin.panel'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al crear usuario: {str(e)}', 'danger')
 
-    # GET: Mostrar formulario
-    roles = Rol.query.order_by(Rol.nombre).all()
-    return render_template('crear_usuario.html', roles=roles)
+    return render_template('crear_usuario.html', roles=roles, grupos=todos_grupos, dashboards=todos_dashboards)
 
 @admin_bp.route('/editar_usuario/<int:id>', methods=['GET', 'POST'])
 @login_required
 def editar_usuario(id):
     usuario_a_editar = Usuario.query.get_or_404(id)
 
-    if request.method == 'POST':
-        # 1. Recoger datos del formulario
-        usuario_a_editar.nombre_completo = request.form.get('nombre_completo')
-        usuario_a_editar.email = request.form.get('email')
-        usuario_a_editar.rol_id = request.form.get('rol_id')
-        
-        # Checkbox: si está marcado es True, si no, False
-        forzar_cambio = request.form.get('forzar_cambio_clave') == '1'
-        usuario_a_editar.cambio_clave_requerido = forzar_cambio
+    # Listas para permisos y roles
+    todos_grupos = Grupo.query.order_by(Grupo.orden).all()
+    todos_dashboards = Dashboard.query.order_by(Dashboard.grupo_id, Dashboard.orden).all()
+    roles = Rol.query.order_by(Rol.nombre).all()
 
-        # 2. Lógica de Contraseña (Solo si escribieron algo)
+    if request.method == 'POST':
+        email_nuevo = request.form.get('email')
+        
+        # 1. VALIDACIÓN: Correo Duplicado (Verificar si existe Y si no es el mismo usuario)
+        usuario_existente = Usuario.query.filter_by(email=email_nuevo).first()
+        if usuario_existente and usuario_existente.id != id:
+            flash('Error: Ese correo electrónico ya pertenece a otro usuario.', 'danger')
+            return render_template('editar_usuario.html', usuario=usuario_a_editar, roles=roles, grupos=todos_grupos, dashboards=todos_dashboards)
+
+        # 2. Actualizar Datos Básicos
+        usuario_a_editar.nombre_completo = request.form.get('nombre_completo')
+        usuario_a_editar.email = email_nuevo
+        usuario_a_editar.rol_id = request.form.get('rol_id')
+        usuario_a_editar.cambio_clave_requerido = request.form.get('forzar_cambio_clave') == '1'
+
+        # 3. Actualizar Contraseña (Si aplica)
         password = request.form.get('password')
-        if password and password.strip(): # Si hay texto y no son solo espacios
+        if password and password.strip():
             usuario_a_editar.set_password(password)
             flash('Contraseña actualizada.', 'info')
+
+        # 4. ACTUALIZAR PERMISOS
+        # Limpiamos todo primero
+        usuario_a_editar.grupos_permitidos = []
+        usuario_a_editar.dashboards_permitidos = []
+
+        # Obtenemos lo nuevo del form
+        grupos_ids = request.form.getlist('permisos_grupos')
+        dashboards_ids = request.form.getlist('permisos_dashboards')
+
+        for gid in grupos_ids:
+            grupo = Grupo.query.get(int(gid))
+            if grupo: usuario_a_editar.grupos_permitidos.append(grupo)
         
-        # 3. Guardar cambios
+        for did in dashboards_ids:
+            dash = Dashboard.query.get(int(did))
+            if dash: usuario_a_editar.dashboards_permitidos.append(dash)
+
         try:
             db.session.commit()
-            
-            # 4. Registrar Log
-            registrar_log(
-                accion="Edición de Usuario", 
-                detalles=f"Editó los datos del usuario {usuario_a_editar.nombre_completo} (ID: {usuario_a_editar.id})"
-            )
-            
+            registrar_log("Edición de Usuario", f"Editó datos y permisos de {usuario_a_editar.nombre_completo}")
             flash('Usuario actualizado con éxito.', 'success')
             return redirect(url_for('admin.panel'))
             
         except Exception as e:
             db.session.rollback()
-            flash('Error al actualizar: El correo podría estar duplicado.', 'danger')
+            flash(f'Error al actualizar en base de datos: {str(e)}', 'danger')
 
-    # GET: Cargar formulario con datos actuales
-    roles = Rol.query.order_by(Rol.nombre).all()
-    return render_template('editar_usuario.html', 
-                           usuario=usuario_a_editar,
-                           roles=roles)
+    return render_template('editar_usuario.html', usuario=usuario_a_editar, roles=roles, grupos=todos_grupos, dashboards=todos_dashboards)
 
 @admin_bp.route('/toggle_activo/<int:id>', methods=['POST'])
 @login_required

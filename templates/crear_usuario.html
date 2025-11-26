@@ -12,32 +12,41 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
             <div class="space-y-6">
                 <div>
                     <label for="nombre_completo" class="block text-sm font-medium text-gray-700">Nombre Completo</label>
-                    <input type="text" name="nombre_completo" id="nombre_completo" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Ej: Juan Pérez" required>
+                    <input type="text" name="nombre_completo" id="nombre_completo" 
+                           value="{{ datos_previos.nombre_completo if datos_previos else '' }}"
+                           class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
+                           placeholder="Ej: Juan Pérez" required>
                 </div>
                 
                 <div>
                     <label for="email" class="block text-sm font-medium text-gray-700">Correo Electrónico</label>
-                    <input type="email" name="email" id="email" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="ejemplo@estadisticas.cl" required>
+                    <input type="email" name="email" id="email" 
+                           value="{{ datos_previos.email if datos_previos else '' }}"
+                           class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
+                           placeholder="ejemplo@estadisticas.cl" required>
                 </div>
             </div>
 
             <div class="space-y-6">
                 <div>
                     <label for="rol_id" class="block text-sm font-medium text-gray-700">Rol de Sistema</label>
-                    <select name="rol_id" id="rol_id" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" required>
-                        <option value="" disabled selected>Selecciona un rol</option>
+                    <select name="rol_id" id="rol_id" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                        <option value="" disabled {% if not datos_previos %}selected{% endif %}>Selecciona un rol</option>
                         {% for rol in roles %}
-                            <option value="{{ rol.id }}">{{ rol.nombre }}</option>
+                            <option value="{{ rol.id }}" {% if datos_previos and datos_previos.rol_id == rol.id %}selected{% endif %}>
+                                {{ rol.nombre }}
+                            </option>
                         {% endfor %}
                     </select>
                 </div>
 
                 <div>
                     <label for="password" class="block text-sm font-medium text-gray-700">Contraseña Provisional</label>
-                    <input type="password" name="password" id="password" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" required>
+                    <input type="password" name="password" id="password" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
                 </div>
 
                 <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -54,9 +63,40 @@
             </div>
         </div>
 
+        <div class="border-t pt-6 mt-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-2">Permisos de Acceso</h3>
+            <p class="text-sm text-gray-500 mb-4">Selecciona qué grupos y paneles podrá ver este usuario.</p>
+
+            <div class="grid grid-cols-1 gap-4">
+                {% for grupo in grupos %}
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="flex items-center mb-3 pb-2 border-b border-gray-200">
+                        <input type="checkbox" name="permisos_grupos" value="{{ grupo.id }}" id="g_{{ grupo.id }}"
+                               class="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                               {% if datos_previos and grupo.id in datos_previos.permisos_grupos %}checked{% endif %}>
+                        <label for="g_{{ grupo.id }}" class="ml-2 text-base font-bold text-gray-800">{{ grupo.nombre }}</label>
+                    </div>
+
+                    <div class="ml-6 grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {% for dash in dashboards %}
+                            {% if dash.grupo_id == grupo.id %}
+                            <div class="flex items-center">
+                                <input type="checkbox" name="permisos_dashboards" value="{{ dash.id }}" id="d_{{ dash.id }}"
+                                       class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                       {% if datos_previos and dash.id in datos_previos.permisos_dashboards %}checked{% endif %}>
+                                <label for="d_{{ dash.id }}" class="ml-2 text-sm text-gray-600">{{ dash.titulo }}</label>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
         <div class="flex justify-end gap-4 pt-6 border-t mt-8">
             <a href="{{ url_for('admin.panel') }}" class="btn btn-secondary">Cancelar</a>
-            <button type="submit" class="btn btn-primary shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition">Crear Usuario</button>
+            <button type="submit" class="btn btn-primary shadow-md hover:shadow-lg">Crear Usuario</button>
         </div>
     </form>
 </div>

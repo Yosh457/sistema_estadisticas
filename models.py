@@ -6,6 +6,17 @@ import pytz
 
 db = SQLAlchemy()
 
+# --- TABLAS INTERMEDIAS ---
+usuario_grupos = db.Table('usuario_grupos',
+    db.Column('usuario_id', db.Integer, db.ForeignKey('usuarios.id'), primary_key=True),
+    db.Column('grupo_id', db.Integer, db.ForeignKey('grupos.id'), primary_key=True)
+)
+
+usuario_dashboards = db.Table('usuario_dashboards',
+    db.Column('usuario_id', db.Integer, db.ForeignKey('usuarios.id'), primary_key=True),
+    db.Column('dashboard_id', db.Integer, db.ForeignKey('dashboards.id'), primary_key=True)
+)
+
 def obtener_hora_chile():
     chile_tz = pytz.timezone('America/Santiago')
     return datetime.now(chile_tz).replace(tzinfo=None)
@@ -34,6 +45,15 @@ class Usuario(db.Model, UserMixin):
     rol_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
     rol = db.relationship('Rol', back_populates='usuarios')
 
+    # Acceso a grupos permitidos
+    grupos_permitidos = db.relationship('Grupo', secondary=usuario_grupos, lazy='subquery',
+        backref=db.backref('usuarios_con_acceso', lazy=True))
+    
+    # Acceso a dashboards permitidos
+    dashboards_permitidos = db.relationship('Dashboard', secondary=usuario_dashboards, lazy='subquery',
+        backref=db.backref('usuarios_con_acceso', lazy=True))
+
+    # Métodos password
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 

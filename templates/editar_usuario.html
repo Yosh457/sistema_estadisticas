@@ -61,6 +61,37 @@
             </div>
         </div>
 
+        <div class="border-t pt-6 mt-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-2">Permisos de Acceso</h3>
+            <p class="text-sm text-gray-500 mb-4">Selecciona qué grupos y paneles podrá ver este usuario.</p>
+
+            <div class="grid grid-cols-1 gap-4">
+                {% for grupo in grupos %}
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="flex items-center mb-3 pb-2 border-b border-gray-200">
+                        <input type="checkbox" name="permisos_grupos" value="{{ grupo.id }}" id="g_{{ grupo.id }}"
+                               class="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                               {% if grupo in usuario.grupos_permitidos %}checked{% endif %}>
+                        <label for="g_{{ grupo.id }}" class="ml-2 text-base font-bold text-gray-800">{{ grupo.nombre }}</label>
+                    </div>
+
+                    <div class="ml-6 grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {% for dash in dashboards %}
+                            {% if dash.grupo_id == grupo.id %}
+                            <div class="flex items-center">
+                                <input type="checkbox" name="permisos_dashboards" value="{{ dash.id }}" id="d_{{ dash.id }}"
+                                       class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                       {% if dash in usuario.dashboards_permitidos %}checked{% endif %}>
+                                <label for="d_{{ dash.id }}" class="ml-2 text-sm text-gray-600">{{ dash.titulo }}</label>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
         <div class="flex justify-end gap-4 pt-6 border-t mt-8">
             <a href="{{ url_for('admin.panel') }}" class="btn btn-secondary">Cancelar</a>
             <button type="submit" class="btn btn-primary shadow-md hover:shadow-lg">Guardar Cambios</button>
@@ -70,24 +101,20 @@
 
 <div id="confirmation-modal" class="fixed inset-0 z-50 items-center justify-center hidden bg-black bg-opacity-50 backdrop-blur-sm">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 m-4 text-center transform transition-all scale-100">
-        
         <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
             <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
         </div>
-
         <h3 class="text-lg font-bold text-gray-800 mb-2">Confirmar Cambios</h3>
         <p class="text-sm text-gray-600 mb-6">
             Estás a punto de modificar los datos de <strong>{{ usuario.nombre_completo }}</strong>. <br>¿Deseas continuar?
         </p>
-        
         <div class="flex justify-center gap-3">
             <button id="cancel-save" class="btn btn-secondary">Cancelar</button>
             <button id="confirm-save" class="btn btn-primary">Sí, Guardar</button>
         </div>
     </div>
 </div>
-
 <script src="{{ url_for('static', filename='modal_handler.js') }}"></script>
 {% endblock %}
