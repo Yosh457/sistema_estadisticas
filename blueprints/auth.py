@@ -3,12 +3,24 @@ from flask_login import login_user, logout_user, login_required, current_user
 from datetime import datetime, timedelta
 import pytz
 import secrets
+import re
 
 # Importamos modelos y utilidades
 from models import db, Usuario
 from utils import registrar_log, enviar_correo_reseteo
 
 auth_bp = Blueprint('auth', __name__, template_folder='../templates')
+
+# --- Función Auxiliar de Validación ---
+def es_password_segura(password):
+    """Valida que la contraseña cumpla con los requisitos de seguridad."""
+    if len(password) < 8:
+        return False
+    if not re.search(r"[A-Z]", password): # Busca al menos una mayúscula
+        return False
+    if not re.search(r"[0-9]", password): # Busca al menos un número
+        return False
+    return True
 
 # --- Lógica de Redirección ---
 def obtener_ruta_redireccion(usuario):
@@ -82,6 +94,11 @@ def cambiar_clave():
         
     if request.method == 'POST':
         nueva_password = request.form.get('nueva_password')
+
+        # --- VALIDACIÓN BACKEND (Cambio Obligatorio) ---
+        if not es_password_segura(nueva_password):
+            flash('Error: La contraseña debe tener al menos 8 caracteres, una mayúscula y un número.', 'danger')
+            return render_template('cambiar_clave.html')
         
         # Cambiamos la clave
         current_user.set_password(nueva_password)
@@ -147,6 +164,13 @@ def resetear_clave(token):
         
     if request.method == 'POST':
         nueva_password = request.form.get('nueva_password')
+
+        # --- VALIDACIÓN BACKEND (Recuperación) ---
+        if not es_password_segura(nueva_password):
+            flash('Error: La contraseña debe tener al menos 8 caracteres, una mayúscula y un número.', 'danger')
+            return render_template('resetear_clave.html')
+        
+        # Cambiamos la clave
         usuario.set_password(nueva_password)
         
         # Limpiar token
