@@ -1,6 +1,7 @@
 import os
-import csv
 import io
+from openpyxl import Workbook
+from openpyxl.styles import Font
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, make_response
 from flask_login import login_required, current_user
 from sqlalchemy import or_
@@ -347,32 +348,36 @@ def toggle_dashboard(id):
     dashboard = Dashboard.query.get_or_404(id)
     dashboard.activo = not dashboard.activo
     db.session.commit()
-    flash(f'Dashboard "{dashboard.titulo}" {"activado" if dashboard.activo else "desactivado"}.', 'info')
+    
+    estado = "activado" if dashboard.activo else "desactivado"
+    registrar_log("Cambio Estado Dashboard", f"El dashboard '{dashboard.titulo}' fue {estado}.")
+    
+    flash(f'Dashboard "{dashboard.titulo}" {estado}.', 'success')
     return redirect(url_for('admin.admin_dashboards'))
 
-@admin_bp.route('/exportar_logs')
+@admin_bp.route('/exportar_logs_xlsx')
 @login_required
 @admin_required
-def exportar_logs():
-    # 1. Obtenemos todos los logs (ordenados por fecha descendente)
+def exportar_logs_xlsx():
+    # 1. Obtenemos todos los logs ordenados por fecha (más reciente primero)
     logs = Log.query.order_by(Log.timestamp.desc()).all()
-    
-    # 2. Creamos un buffer BINARIO en memoria (BytesIO)
-    output = io.BytesIO()
-    # 3. Escribimos el BOM UTF-8 explícito (Esto evita problemas con tildes y la ñ en Excel)
-    output.write('\ufeff'.encode('utf-8'))  # BOM explícito
 
-    # 4. Envolvemos el buffer binario con un stream de texto UTF-8
-    text_stream = io.TextIOWrapper(output, encoding='utf-8', newline='')
-    # 5. Creamos el escritor CSV usando ';' como separador
-    writer = csv.writer(text_stream, delimiter=';')
+    # 2. Creamos un libro de Excel en memoria
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Logs"
 
-    # 6. Escribimos la fila de encabezados
-    writer.writerow(['ID', 'Fecha y Hora', 'Usuario', 'Acción', 'Detalles'])
+    # 3. Definimos los encabezados de la hoja
+    headers = ['ID', 'Fecha y Hora', 'Usuario', 'Acción', 'Detalles']
+    ws.append(headers)
 
-    # 7. Escribimos cada registro de log en el archivo
+    # 4. Aplicamos estilo en negrita a la fila de encabezados
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
+    # 5. Escribimos los datos de cada log en la hoja
     for log in logs:
-        writer.writerow([
+        ws.append([
             log.id,
             log.timestamp.strftime('%d-%m-%Y %H:%M:%S'),
             log.usuario_nombre,
@@ -380,13 +385,30 @@ def exportar_logs():
             log.detalles
         ])
 
-    # 8. Aseguramos que todo el contenido se escriba en el buffer
-    text_stream.flush()
+    # 6. Ajustamos automáticamente el ancho de las columnas
+    for column_cells in ws.columns:
+        max_length = 0
+        column_letter = column_cells[0].column_letter
 
-    # 9. Preparamos la respuesta HTTP para descargar el archivo CSV
+        for cell in column_cells:
+            if cell.value:
+                max_length = max(max_length, len(str(cell.value)))
+
+        ws.column_dimensions[column_letter].width = max_length + 2
+
+    # 7. Guardamos el archivo Excel en un buffer en memoria
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    # 8. Preparamos la respuesta HTTP para descargar el archivo XLSX
     response = make_response(output.getvalue())
-    response.headers['Content-Disposition'] = 'attachment; filename=reporte_logs.csv'
-    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    response.headers[
+        'Content-Disposition'
+    ] = 'attachment; filename=reporte_logs.xlsx'
+    response.headers[
+        'Content-Type'
+    ] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
-    # 10. Retornamos el archivo para que el navegador lo descargue
+    # 9. Retornamos el archivo para su descarga
     return response
