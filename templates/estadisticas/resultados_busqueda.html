@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Resultados de búsqueda{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-6 py-8">
+    
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800">Resultados de búsqueda</h2>
+            <p class="text-gray-500 mt-1">
+                Mostrando resultados para: <span class="font-bold text-blue-600">"{{ busqueda }}"</span>
+            </p>
+        </div>
+        <a href="{{ url_for('estadisticas.seleccion_grupo') }}" class="btn btn-secondary">
+            &larr; Volver al Inicio
+        </a>
+    </div>
+
+    {% if resultados %}
+        <div class="grid grid-cols-1 gap-4">
+            {% for dash in resultados %}
+            <div class="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-100 flex justify-between items-center">
+                <div class="flex items-center">
+                    <div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-4 font-bold text-lg">
+                        {{ dash.titulo[0] }}
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-800">{{ dash.titulo }}</h3>
+                        <p class="text-sm text-gray-500">Grupo: {{ dash.grupo.nombre }}</p>
+                    </div>
+                </div>
+                
+                <a href="{{ url_for('estadisticas.ver_dashboard', id=dash.id) }}" 
+                   class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                    Ver Panel
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-12 bg-white rounded-xl shadow-sm border border-dashed border-gray-300">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 class="mt-2 text-lg font-medium text-gray-900">No se encontraron resultados</h3>
+            <p class="mt-1 text-gray-500">Intenta con otra palabra clave o verifica tus permisos.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
