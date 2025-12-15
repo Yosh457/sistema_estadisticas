@@ -1,5 +1,7 @@
 import os
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+import csv
+import io
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, make_response
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from werkzeug.security import generate_password_hash
@@ -347,3 +349,44 @@ def toggle_dashboard(id):
     db.session.commit()
     flash(f'Dashboard "{dashboard.titulo}" {"activado" if dashboard.activo else "desactivado"}.', 'info')
     return redirect(url_for('admin.admin_dashboards'))
+
+@admin_bp.route('/exportar_logs')
+@login_required
+@admin_required
+def exportar_logs():
+    # 1. Obtenemos todos los logs (ordenados por fecha descendente)
+    logs = Log.query.order_by(Log.timestamp.desc()).all()
+    
+    # 2. Creamos un buffer BINARIO en memoria (BytesIO)
+    output = io.BytesIO()
+    # 3. Escribimos el BOM UTF-8 explícito (Esto evita problemas con tildes y la ñ en Excel)
+    output.write('\ufeff'.encode('utf-8'))  # BOM explícito
+
+    # 4. Envolvemos el buffer binario con un stream de texto UTF-8
+    text_stream = io.TextIOWrapper(output, encoding='utf-8', newline='')
+    # 5. Creamos el escritor CSV usando ';' como separador
+    writer = csv.writer(text_stream, delimiter=';')
+
+    # 6. Escribimos la fila de encabezados
+    writer.writerow(['ID', 'Fecha y Hora', 'Usuario', 'Acción', 'Detalles'])
+
+    # 7. Escribimos cada registro de log en el archivo
+    for log in logs:
+        writer.writerow([
+            log.id,
+            log.timestamp.strftime('%d-%m-%Y %H:%M:%S'),
+            log.usuario_nombre,
+            log.accion,
+            log.detalles
+        ])
+
+    # 8. Aseguramos que todo el contenido se escriba en el buffer
+    text_stream.flush()
+
+    # 9. Preparamos la respuesta HTTP para descargar el archivo CSV
+    response = make_response(output.getvalue())
+    response.headers['Content-Disposition'] = 'attachment; filename=reporte_logs.csv'
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+
+    # 10. Retornamos el archivo para que el navegador lo descargue
+    return response
