@@ -239,7 +239,8 @@ def ver_logs():
     pagination = query.paginate(page=page, per_page=15, error_out=False)
     
     # Datos para los selectores (Dropdowns)
-    todos_los_usuarios = Usuario.query.order_by(Usuario.nombre_completo).all()
+    todos_los_usuarios = Usuario.query.all()
+    todos_los_usuarios.sort(key=lambda u: u.nombre_completo)
     
     # Lista manual de las acciones que hemos programado en este sistema
     acciones_posibles = [
