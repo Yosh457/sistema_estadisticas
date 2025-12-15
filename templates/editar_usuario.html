@@ -1,14 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Editar Usuario{% endblock %}
+{% block title %}Editar Permisos{% endblock %}
 
 {% block content %}
 <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-4xl mx-auto my-12">
     
     <div class="border-b pb-4 mb-6">
         <h2 class="text-2xl font-bold text-gray-800">
-            Editando a: <span class="text-blue-600">{{ usuario.nombre_completo }}</span>
+            Gestionar Permisos
         </h2>
-        <p class="text-gray-500 text-sm mt-1">Modifica los datos del usuario o actualiza su contraseña.</p>
+        <p class="text-gray-500 text-sm mt-1">
+            Editando acceso local para: <strong class="text-blue-600">{{ usuario.nombre_completo }}</strong>
+        </p>
     </div>
 
     <form id="edit-user-form" method="post" class="space-y-8">
@@ -17,19 +19,28 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             
             <div class="space-y-6">
-                <div>
-                    <label for="nombre_completo" class="block text-sm font-medium text-gray-700">Nombre Completo</label>
-                    <input type="text" name="nombre_completo" value="{{ usuario.nombre_completo }}" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
-                </div>
-                <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700">Correo Electrónico</label>
-                    <input type="email" name="email" value="{{ usuario.email }}" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase mb-3">Datos Globales (Solo Lectura)</h3>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-600">Nombre Completo</label>
+                        <input type="text" value="{{ usuario.nombre_completo }}" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed" disabled>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600">Correo Electrónico</label>
+                        <input type="text" value="{{ usuario.email }}" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed" disabled>
+                    </div>
+                    
+                    <p class="text-xs text-blue-500 mt-2">
+                        ℹ️ Para modificar estos datos o la contraseña, debes hacerlo en el Portal TICs Central.
+                    </p>
                 </div>
             </div>
 
             <div class="space-y-6">
                 <div>
-                    <label for="rol_id" class="block text-sm font-medium text-gray-700">Rol</label>
+                    <label for="rol_id" class="block text-sm font-medium text-gray-700">Rol de Sistema</label>
                     <select name="rol_id" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
                         {% for rol in roles %}
                             <option value="{{ rol.id }}" {% if rol.id == usuario.rol_id %}selected{% endif %}>
@@ -37,26 +48,6 @@
                             </option>
                         {% endfor %}
                     </select>
-                </div>
-
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700">Nueva Contraseña</label>
-                    <input type="password" name="password" placeholder="Dejar en blanco para mantener la actual" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                    <p class="text-xs text-gray-500 mt-1">Solo llena este campo si deseas cambiar la clave del usuario.</p>
-                </div>
-
-                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <div class="flex items-start">
-                        <div class="flex items-center h-5">
-                            <input type="checkbox" name="forzar_cambio_clave" value="1" id="forzar_cambio_clave" 
-                                   class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                   {% if usuario.cambio_clave_requerido %}checked{% endif %}>
-                        </div>
-                        <div class="ml-3 text-sm">
-                            <label for="forzar_cambio_clave" class="font-medium text-gray-700">Forzar cambio de contraseña</label>
-                            <p class="text-gray-500">El usuario deberá cambiar su clave al próximo inicio.</p>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -94,7 +85,7 @@
 
         <div class="flex justify-end gap-4 pt-6 border-t mt-8">
             <a href="{{ url_for('admin.panel') }}" class="btn btn-secondary">Cancelar</a>
-            <button type="submit" class="btn btn-primary shadow-md hover:shadow-lg">Guardar Cambios</button>
+            <button type="submit" class="btn btn-primary shadow-md hover:shadow-lg">Actualizar Permisos</button>
         </div>
     </form>
 </div>

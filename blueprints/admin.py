@@ -1,52 +1,45 @@
+# blueprints/admin.py
 import os
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from sqlalchemy import or_
-from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
-from datetime import datetime
-from models import db, Usuario, Rol, Log, Dashboard, Grupo
+from models import db, Usuario, Rol, Log, Dashboard, Grupo, UsuarioGlobal # Importamos la Global
 from utils import registrar_log, admin_required
 
 admin_bp = Blueprint('admin', __name__, template_folder='../templates', url_prefix='/admin')
 
 @admin_bp.route('/panel')
 @login_required
+@admin_required
 def panel():
-    # Paginación
     page = request.args.get('page', 1, type=int)
-    
-    # Filtros que vienen de la URL (GET)
     busqueda = request.args.get('busqueda', '')
     rol_filtro = request.args.get('rol_filtro', '')
     estado_filtro = request.args.get('estado_filtro', '')
 
-    # Query base
-    query = Usuario.query
+    # Hacemos Join con la identidad global para buscar por nombre
+    query = Usuario.query.join(Usuario.identidad)
 
-    # 1. Filtro de Búsqueda (Nombre o Email)
     if busqueda:
         query = query.filter(
             or_(
-                Usuario.nombre_completo.ilike(f'%{busqueda}%'),
-                Usuario.email.ilike(f'%{busqueda}%')
+                UsuarioGlobal.nombre_completo.ilike(f'%{busqueda}%'),
+                UsuarioGlobal.email.ilike(f'%{busqueda}%')
             )
         )
     
-    # 2. Filtro de Rol
     if rol_filtro:
         query = query.filter(Usuario.rol_id == rol_filtro)
 
-    # 3. Filtro de Estado
     if estado_filtro == 'activo':
         query = query.filter(Usuario.activo == True)
     elif estado_filtro == 'inactivo':
         query = query.filter(Usuario.activo == False)
     
-    # Ordenar y paginar
-    pagination = query.order_by(Usuario.id).paginate(page=page, per_page=10, error_out=False)
+    # Ordenamos por nombre global
+    pagination = query.order_by(UsuarioGlobal.nombre_completo).paginate(page=page, per_page=10, error_out=False)
     
-    # Obtener roles para llenar el select del filtro
     roles_para_filtro = Rol.query.order_by(Rol.nombre).all()
 
     return render_template('admin_panel.html', 
@@ -57,56 +50,37 @@ def panel():
                            estado_filtro=estado_filtro,
                            usuario=current_user)
 
-# --- RUTAS PANEL DE ADMIN ---
-
-# --- GESTIÓN DE USUARIOS ---
+# --- VINCULAR USUARIO (Antes Crear) ---
 @admin_bp.route('/crear_usuario', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def crear_usuario():
-    # Obtenemos listas para los permisos
+    # Listas para permisos
     todos_grupos = Grupo.query.order_by(Grupo.orden).all()
     todos_dashboards = Dashboard.query.order_by(Dashboard.grupo_id, Dashboard.orden).all()
     roles = Rol.query.order_by(Rol.nombre).all()
 
-    # POST: Procesar formulario
     if request.method == 'POST':
-        nombre = request.form.get('nombre_completo')
-        email = request.form.get('email')
-        password = request.form.get('password')
+        usuario_global_id = request.form.get('usuario_global_id')
         rol_id = request.form.get('rol_id')
         
-        # Checkbox devuelve '1' si está marcado, o nada si no
-        forzar_cambio = request.form.get('forzar_cambio_clave') == '1'
+        if not usuario_global_id or not rol_id:
+            flash('Debes seleccionar un funcionario y un rol.', 'danger')
+            return redirect(url_for('admin.crear_usuario'))
 
-        # 1. VALIDACIÓN: Correo Duplicado
-        if Usuario.query.filter_by(email=email).first():
-            flash('Error: El correo electrónico ya está registrado en el sistema.', 'danger')
-            # Guardamos lo que el usuario escribió para devolverlo
-            datos_previos = {
-                'nombre_completo': nombre,
-                'email': email,
-                'rol_id': int(rol_id) if rol_id else None,
-                'permisos_grupos': [int(x) for x in request.form.getlist('permisos_grupos')], # Lista de IDs
-                'permisos_dashboards': [int(x) for x in request.form.getlist('permisos_dashboards')]
-            }
-            
-            return render_template('crear_usuario.html', 
-                                   roles=roles, 
-                                   grupos=todos_grupos, 
-                                   dashboards=todos_dashboards,
-                                   datos_previos=datos_previos)
+        # Validar si ya existe localmente
+        if Usuario.query.filter_by(usuario_global_id=usuario_global_id).first():
+            flash('Este funcionario ya tiene acceso al sistema.', 'warning')
+            return redirect(url_for('admin.crear_usuario'))
 
-        # 2. Crear Usuario
+        # Crear Usuario Local
         nuevo_usuario = Usuario(
-            nombre_completo=nombre,
-            email=email,
+            usuario_global_id=usuario_global_id,
             rol_id=rol_id,
-            cambio_clave_requerido=forzar_cambio,
             activo=True
         )
-        nuevo_usuario.set_password(password)
         
-        # 3. ASIGNAR PERMISOS (Solo si es rol Lector, aunque el admin ve todo por defecto en el código)
+        # ASIGNAR PERMISOS DE DASHBOARDS (Si aplica)
         grupos_ids = request.form.getlist('permisos_grupos')
         dashboards_ids = request.form.getlist('permisos_dashboards')
 
@@ -122,74 +96,79 @@ def crear_usuario():
             db.session.add(nuevo_usuario)
             db.session.commit()
 
-            registrar_log("Creación de Usuario", f"Creó al usuario {nombre} ({email}) con permisos asignados.")
-            flash('Usuario creado con éxito.', 'success')
+            # Obtener nombre para log
+            usr_glob = UsuarioGlobal.query.get(usuario_global_id)
+            nombre_log = usr_glob.nombre_completo if usr_glob else "ID " + str(usuario_global_id)
+
+            registrar_log("Vinculación Usuario", f"Otorgó acceso a {nombre_log} con permisos específicos.")
+            flash('Funcionario vinculado con éxito.', 'success')
             return redirect(url_for('admin.panel'))
         except Exception as e:
             db.session.rollback()
-            flash(f'Error al crear usuario: {str(e)}', 'danger')
+            flash(f'Error al vincular: {str(e)}', 'danger')
 
-    return render_template('crear_usuario.html', roles=roles, grupos=todos_grupos, dashboards=todos_dashboards)
+    # BUSCAR USUARIOS GLOBALES DISPONIBLES (Que no estén ya en local)
+    ids_locales = db.session.query(Usuario.usuario_global_id).all()
+    ids_locales_lista = [id[0] for id in ids_locales]
+
+    if ids_locales_lista:
+        usuarios_disponibles = UsuarioGlobal.query.filter(
+            UsuarioGlobal.id.notin_(ids_locales_lista),
+            UsuarioGlobal.activo == True
+        ).order_by(UsuarioGlobal.nombre_completo).all()
+    else:
+        usuarios_disponibles = UsuarioGlobal.query.filter_by(activo=True).order_by(UsuarioGlobal.nombre_completo).all()
+
+    return render_template('crear_usuario.html', 
+                           roles=roles, 
+                           grupos=todos_grupos, 
+                           dashboards=todos_dashboards,
+                           usuarios_disponibles=usuarios_disponibles)
 
 @admin_bp.route('/editar_usuario/<int:id>', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def editar_usuario(id):
-    usuario_a_editar = Usuario.query.get_or_404(id)
+    usuario_local = Usuario.query.get_or_404(id)
 
-    # Listas para permisos y roles
     todos_grupos = Grupo.query.order_by(Grupo.orden).all()
     todos_dashboards = Dashboard.query.order_by(Dashboard.grupo_id, Dashboard.orden).all()
     roles = Rol.query.order_by(Rol.nombre).all()
 
     if request.method == 'POST':
-        email_nuevo = request.form.get('email')
+        # Solo editamos Rol y Permisos
+        usuario_local.rol_id = request.form.get('rol_id')
         
-        # 1. VALIDACIÓN: Correo Duplicado (Verificar si existe Y si no es el mismo usuario)
-        usuario_existente = Usuario.query.filter_by(email=email_nuevo).first()
-        if usuario_existente and usuario_existente.id != id:
-            flash('Error: Ese correo electrónico ya pertenece a otro usuario.', 'danger')
-            return render_template('editar_usuario.html', usuario=usuario_a_editar, roles=roles, grupos=todos_grupos, dashboards=todos_dashboards)
+        # Actualizar Permisos (Borrar y volver a agregar)
+        usuario_local.grupos_permitidos = []
+        usuario_local.dashboards_permitidos = []
 
-        # 2. Actualizar Datos Básicos
-        usuario_a_editar.nombre_completo = request.form.get('nombre_completo')
-        usuario_a_editar.email = email_nuevo
-        usuario_a_editar.rol_id = request.form.get('rol_id')
-        usuario_a_editar.cambio_clave_requerido = request.form.get('forzar_cambio_clave') == '1'
-
-        # 3. Actualizar Contraseña (Si aplica)
-        password = request.form.get('password')
-        if password and password.strip():
-            usuario_a_editar.set_password(password)
-            flash('Contraseña actualizada.', 'info')
-
-        # 4. ACTUALIZAR PERMISOS
-        # Limpiamos todo primero
-        usuario_a_editar.grupos_permitidos = []
-        usuario_a_editar.dashboards_permitidos = []
-
-        # Obtenemos lo nuevo del form
         grupos_ids = request.form.getlist('permisos_grupos')
         dashboards_ids = request.form.getlist('permisos_dashboards')
 
         for gid in grupos_ids:
             grupo = Grupo.query.get(int(gid))
-            if grupo: usuario_a_editar.grupos_permitidos.append(grupo)
+            if grupo: usuario_local.grupos_permitidos.append(grupo)
         
         for did in dashboards_ids:
             dash = Dashboard.query.get(int(did))
-            if dash: usuario_a_editar.dashboards_permitidos.append(dash)
+            if dash: usuario_local.dashboards_permitidos.append(dash)
 
         try:
             db.session.commit()
-            registrar_log("Edición de Usuario", f"Editó datos y permisos de {usuario_a_editar.nombre_completo}")
-            flash('Usuario actualizado con éxito.', 'success')
+            registrar_log("Edición Permisos", f"Actualizó permisos de {usuario_local.nombre_completo}")
+            flash('Permisos actualizados con éxito.', 'success')
             return redirect(url_for('admin.panel'))
             
         except Exception as e:
             db.session.rollback()
-            flash(f'Error al actualizar en base de datos: {str(e)}', 'danger')
+            flash(f'Error al actualizar: {str(e)}', 'danger')
 
-    return render_template('editar_usuario.html', usuario=usuario_a_editar, roles=roles, grupos=todos_grupos, dashboards=todos_dashboards)
+    return render_template('editar_usuario.html', 
+                           usuario=usuario_local, 
+                           roles=roles, 
+                           grupos=todos_grupos, 
+                           dashboards=todos_dashboards)
 
 @admin_bp.route('/toggle_activo/<int:id>', methods=['POST'])
 @login_required

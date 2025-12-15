@@ -1,15 +1,25 @@
-# utils.py
+# utils/helpers.py
 import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
-from functools import wraps
-from flask import abort, redirect, url_for, flash
+from flask import url_for
 from flask_login import current_user
 from models import db, Log
 
-# --- LOGGING ---
+import re
+
+def es_password_segura(password):
+    """Valida que la contraseña cumpla con los requisitos de seguridad."""
+    if len(password) < 8:
+        return False
+    if not re.search(r"[A-Z]", password): 
+        return False
+    if not re.search(r"[0-9]", password): 
+        return False
+    return True
+
 def registrar_log(accion, detalles):
     """Registra una acción en la base de datos."""
     if current_user.is_authenticated:
@@ -28,9 +38,12 @@ def registrar_log(accion, detalles):
             print(f"Error al registrar log: {e}")
             db.session.rollback()
 
-# --- CORREOS ---
 def enviar_correo_reseteo(usuario, token):
-    """Envía el correo con el link de recuperación."""
+    """
+    Envía el correo con el link de recuperación.
+    NOTA: En la arquitectura global, esto eventualmente se moverá al Portal TICs,
+    pero lo mantenemos aquí por compatibilidad temporal o notificaciones futuras.
+    """
     remitente = os.getenv("EMAIL_USUARIO")
     contrasena = os.getenv("EMAIL_CONTRASENA")
     
@@ -40,11 +53,7 @@ def enviar_correo_reseteo(usuario, token):
 
     msg = MIMEMultipart()
     msg['Subject'] = 'Restablecimiento de Contraseña - Sistema Estadísticas'
-    
-    # 2. CAMBIO AQUÍ: Usamos formataddr en lugar de f-string manual
-    # Esto genera un header estándar RFC 2822 que los clientes respetan más
     msg['From'] = formataddr(('Sistema Estadísticas', remitente))
-    
     msg['To'] = usuario.email
 
     # Generamos el link apuntando a la ruta de auth
@@ -75,24 +84,3 @@ def enviar_correo_reseteo(usuario, token):
             print(f"Correo enviado a {usuario.email}")
     except Exception as e:
         print(f"Error enviando correo: {e}")
-
-# --- DECORADORES ---
-def check_password_change(f):
-    """Obliga al usuario a cambiar contraseña si 'cambio_clave_requerido' es True."""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if current_user.is_authenticated and current_user.cambio_clave_requerido:
-            flash('Por seguridad, debes cambiar tu contraseña antes de continuar.', 'warning')
-            return redirect(url_for('auth.cambiar_clave'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-def admin_required(f):
-    """Restringe la vista solo a usuarios con rol 'Admin'."""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Ajusta 'Admin' según como lo hayas guardado en la BD (mayúscula/minúscula)
-        if not current_user.is_authenticated or current_user.rol.nombre != 'Admin':
-            abort(403) # Forbidden
-        return f(*args, **kwargs)
-    return decorated_function

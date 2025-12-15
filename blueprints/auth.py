@@ -1,47 +1,21 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
-from flask_login import login_user, logout_user, login_required, current_user
+# blueprints/auth.py (Estadísticas)
+import secrets
 from datetime import datetime, timedelta
 import pytz
-import secrets
-import re
-
-# Importamos modelos y utilidades
-from models import db, Usuario
-from utils import registrar_log, enviar_correo_reseteo
+from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask_login import login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash
+from models import db, Usuario, UsuarioGlobal 
+from utils import registrar_log, enviar_correo_reseteo, es_password_segura
 
 auth_bp = Blueprint('auth', __name__, template_folder='../templates')
 
-# --- Función Auxiliar de Validación ---
-def es_password_segura(password):
-    """Valida que la contraseña cumpla con los requisitos de seguridad."""
-    if len(password) < 8:
-        return False
-    if not re.search(r"[A-Z]", password): # Busca al menos una mayúscula
-        return False
-    if not re.search(r"[0-9]", password): # Busca al menos un número
-        return False
-    return True
-
-# --- Lógica de Redirección ---
 def obtener_ruta_redireccion(usuario):
-    """Define a dónde va el usuario según su Rol."""
-    if not usuario.rol:
-        return url_for('auth.login')
-    
-    nombre_rol = usuario.rol.nombre
-    
-    if nombre_rol == "Admin":
-        return url_for('admin.panel')
-    elif nombre_rol == "Lector":
-        # CORRECCIÓN: Ahora los lectores van a la selección de grupos
-        return url_for('estadisticas.seleccion_grupo')
-    else:
-        return url_for('estadisticas.seleccion_grupo')
+    if not usuario.rol: return url_for('auth.login')
+    return url_for('admin.panel') if usuario.rol.nombre == "Admin" else url_for('estadisticas.seleccion_grupo')
 
-# --- RUTAS DE LOGIN/LOGOUT ---
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    # Si ya está logueado, lo mandamos a su panel
     if current_user.is_authenticated:
         return redirect(obtener_ruta_redireccion(current_user))
 
@@ -49,30 +23,25 @@ def login():
         email = request.form.get('email')
         password = request.form.get('password')
         
-        # Buscamos el usuario
-        usuario = Usuario.query.filter_by(email=email).first()
+        identidad_global = UsuarioGlobal.query.filter_by(email=email).first()
 
-        # Verificaciones
-        if usuario:
-            if not usuario.activo:
-                flash('Tu cuenta está desactivada. Contacta al administrador.', 'danger')
-                return redirect(url_for('auth.login'))
-        
-        if usuario and usuario.check_password(password):
-            login_user(usuario)
-
-            # Log
-            registrar_log("Inicio de Sesión", f"Usuario {usuario.nombre_completo} inició sesión.")
-
-            # Verificar si requiere cambio de clave INMEDIATAMENTE
-            if usuario.cambio_clave_requerido:
-                return redirect(url_for('auth.cambiar_clave'))
+        if identidad_global and identidad_global.check_password(password):
+            usuario_local = Usuario.query.filter_by(usuario_global_id=identidad_global.id).first()
             
-            flash(f'Bienvenido, {usuario.nombre_completo}', 'success')
-            
-            return redirect(obtener_ruta_redireccion(usuario))
+            if usuario_local and usuario_local.activo and identidad_global.activo:
+                login_user(usuario_local)
+                registrar_log("Inicio de Sesión", f"Usuario {usuario_local.nombre_completo} inició sesión.")
+                
+                if identidad_global.cambio_clave_requerido:
+                    flash('Por seguridad, debes cambiar tu contraseña ahora.', 'warning')
+                    return redirect(url_for('auth.cambiar_clave'))
+                
+                flash(f'Bienvenido, {usuario_local.nombre_completo}', 'success')
+                return redirect(obtener_ruta_redireccion(usuario_local))
+            else:
+                flash('No tienes permisos para acceder a Estadísticas.', 'warning')
         else:
-            flash('Correo o contraseña incorrectos.', 'danger')
+            flash('Credenciales incorrectas.', 'danger')
     
     return render_template('login.html')
 
@@ -84,103 +53,76 @@ def logout():
     flash('Has cerrado sesión correctamente.', 'success')
     return redirect(url_for('auth.login'))
 
-# --- RUTAS DE GESTIÓN DE CLAVE ---
+# --- GESTIÓN DE CLAVES (GLOBAL) ---
+
 @auth_bp.route('/cambiar_clave', methods=['GET', 'POST'])
 @login_required
 def cambiar_clave():
-    # Solo permitimos entrar aquí si el flag está activo
-    if not current_user.cambio_clave_requerido:
-        return redirect(obtener_ruta_redireccion(current_user))
-        
     if request.method == 'POST':
-        nueva_password = request.form.get('nueva_password')
+        password_nueva = request.form.get('nueva_password')
+        password_confirmar = request.form.get('confirmar_password')
 
-        # --- VALIDACIÓN BACKEND (Cambio Obligatorio) ---
-        if not es_password_segura(nueva_password):
-            flash('Error: La contraseña debe tener al menos 8 caracteres, una mayúscula y un número.', 'danger')
+        if password_nueva != password_confirmar:
+            flash('Las nuevas contraseñas no coinciden.', 'warning')
             return render_template('cambiar_clave.html')
-        
-        # Cambiamos la clave
-        current_user.set_password(nueva_password)
-        current_user.cambio_clave_requerido = False # Quitamos el bloqueo
-        db.session.commit()
-        
-        registrar_log("Cambio de Clave", "El usuario actualizó su contraseña obligatoria.")
-        
-        flash('Contraseña actualizada. ¡Gracias!', 'success')
-        return redirect(obtener_ruta_redireccion(current_user))
-        
+
+        if not es_password_segura(password_nueva):
+            flash('La contraseña no es segura.', 'warning')
+            return render_template('cambiar_clave.html')
+
+        try:
+            usuario_global = current_user.identidad
+            usuario_global.password_hash = generate_password_hash(password_nueva)
+            usuario_global.cambio_clave_requerido = False
+            db.session.commit()
+            
+            registrar_log("Cambio de Clave", f"Usuario {current_user.nombre_completo} cambió su clave.")
+            logout_user() # Forzamos re-login
+            flash('Contraseña actualizada. Inicia sesión nuevamente.', 'success')
+            return redirect(url_for('auth.login'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash('Error al actualizar.', 'danger')
+
     return render_template('cambiar_clave.html')
 
 @auth_bp.route('/solicitar-reseteo', methods=['GET', 'POST'])
 def solicitar_reseteo():
-    if current_user.is_authenticated:
-        return redirect(obtener_ruta_redireccion(current_user))
-
     if request.method == 'POST':
         email = request.form.get('email')
-        usuario = Usuario.query.filter_by(email=email).first()
+        usuario_global = UsuarioGlobal.query.filter_by(email=email).first()
         
-        if usuario:
-            # Generar Token
+        if usuario_global:
             token = secrets.token_hex(16)
-            
-            # Hora Chile para expiración (1 hora)
-            chile_tz = pytz.timezone('America/Santiago')
-            ahora_chile = datetime.now(chile_tz).replace(tzinfo=None)
-            expiracion = ahora_chile + timedelta(hours=1)
-            
-            usuario.reset_token = token
-            usuario.reset_token_expiracion = expiracion
+            usuario_global.reset_token = token
+            usuario_global.reset_token_expiracion = datetime.now() + timedelta(hours=1) # Ojo con la TZ si es critica
             db.session.commit()
-            
-            # Enviar correo
-            enviar_correo_reseteo(usuario, token)
-            
-            # Mensaje genérico por seguridad (aunque el usuario no exista, a veces se dice enviado)
-            # Pero aquí seremos explícitos como en tu código anterior
-            flash(f'Se ha enviado un enlace a {email}. Revisa tu bandeja.', 'success')
+            enviar_correo_reseteo(usuario_global, token)
+            flash(f'Se ha enviado un enlace a {email}.', 'success')
         else:
-            flash(f'El correo {email} no está registrado en el sistema.', 'danger')
-            
+            flash(f'El correo {email} no se encuentra registrado.', 'danger')
         return redirect(url_for('auth.login'))
-        
     return render_template('solicitar_reseteo.html')
 
 @auth_bp.route('/resetear-clave/<token>', methods=['GET', 'POST'])
 def resetear_clave(token):
-    if current_user.is_authenticated:
-        return redirect(obtener_ruta_redireccion(current_user))
-
-    usuario = Usuario.query.filter_by(reset_token=token).first()
-    
-    # Validar Token y Expiración
-    chile_tz = pytz.timezone('America/Santiago')
-    ahora_chile = datetime.now(chile_tz).replace(tzinfo=None)
-    
-    if not usuario or not usuario.reset_token_expiracion or usuario.reset_token_expiracion < ahora_chile:
-        flash('El enlace es inválido o ha expirado. Solicita uno nuevo.', 'danger')
+    usuario_global = UsuarioGlobal.query.filter_by(reset_token=token).first()
+    if not usuario_global or not usuario_global.reset_token_expiracion or usuario_global.reset_token_expiracion < datetime.now():
+        flash('Enlace inválido o expirado.', 'danger')
         return redirect(url_for('auth.solicitar_reseteo'))
         
     if request.method == 'POST':
-        nueva_password = request.form.get('nueva_password')
-
-        # --- VALIDACIÓN BACKEND (Recuperación) ---
-        if not es_password_segura(nueva_password):
-            flash('Error: La contraseña debe tener al menos 8 caracteres, una mayúscula y un número.', 'danger')
-            return render_template('resetear_clave.html')
-        
-        # Cambiamos la clave
-        usuario.set_password(nueva_password)
-        
-        # Limpiar token
-        usuario.reset_token = None
-        usuario.reset_token_expiracion = None
+        nueva = request.form.get('nueva_password')
+        if not es_password_segura(nueva):
+            flash('Contraseña insegura.', 'danger')
+            return render_template('resetear_clave.html', token=token)
+            
+        usuario_global.password_hash = generate_password_hash(nueva)
+        usuario_global.reset_token = None
+        usuario_global.cambio_clave_requerido = False
         db.session.commit()
-        
-        registrar_log("Recuperación Clave", f"El usuario {usuario.nombre_completo} reseteó su clave vía correo.")
-        
-        flash('Tu contraseña ha sido restablecida. Inicia sesión.', 'success')
+        flash('Contraseña restablecida. Inicia sesión.', 'success')
         return redirect(url_for('auth.login'))
         
-    return render_template('resetear_clave.html')
+    return render_template('resetear_clave.html', token=token)
