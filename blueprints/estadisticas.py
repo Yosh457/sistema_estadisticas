@@ -1,5 +1,5 @@
 # blueprints/estadisticas.py
-from flask import Blueprint, render_template, abort
+from flask import Blueprint, render_template, abort, request, redirect, url_for
 from flask_login import login_required, current_user
 from models import Dashboard, Grupo
 
@@ -56,3 +56,31 @@ def ver_dashboard(id):
         abort(403)
 
     return render_template('estadisticas/ver.html', dashboard=dashboard)
+
+@estadisticas_bp.route('/buscar')
+@login_required
+def buscar():
+    query = request.args.get('q', '').strip()
+    
+    if not query:
+        return redirect(url_for('estadisticas.seleccion_grupo'))
+
+    # 1. Buscamos TODOS los dashboards que coincidan con el texto (título o descripción)
+    # ilike hace que no importen mayúsculas/minúsculas
+    coincidencias = Dashboard.query.filter(
+        (Dashboard.titulo.ilike(f'%{query}%')) | 
+        (Dashboard.descripcion.ilike(f'%{query}%')),
+        Dashboard.activo == True
+    ).all()
+
+    # 2. FILTRADO DE SEGURIDAD (Permisos)
+    if current_user.rol.nombre == 'Admin':
+        resultados = coincidencias
+    else:
+        # Solo mostramos los que el usuario tiene permitidos
+        # Hacemos la intersección entre "lo que encontró" y "lo que puede ver"
+        resultados = [d for d in coincidencias if d in current_user.dashboards_permitidos]
+
+    return render_template('estadisticas/resultados_busqueda.html', 
+                           resultados=resultados, 
+                           busqueda=query)
