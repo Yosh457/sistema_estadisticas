@@ -6,17 +6,22 @@ app = create_app()
 
 def crear_admin():
     with app.app_context():
+        # 1. Crear las tablas si no existen
+        db.create_all()
         print("--- CREACIÓN DE SUPER ADMIN ---")
         email = input("Ingresa el email del admin: ")
         password = input("Ingresa la contraseña del admin: ")
         
-        # Verificar si el rol Admin existe
+        # 2. Verificar si el rol Admin existe
+        # Si la tabla estaba vacía, el rol no existe, así que lo creamos
         rol_admin = Rol.query.filter_by(nombre='Admin').first()
         if not rol_admin:
-            print("Error: El rol 'Admin' no existe en la BD. Ejecuta el script SQL primero.")
-            return
+            print("El rol 'Admin' no existía. Creándolo automáticamente...")
+            rol_admin = Rol(nombre='Admin')
+            db.session.add(rol_admin)
+            db.session.commit()
 
-        # Verificar si el usuario ya existe
+        # 3. Verificar si el usuario ya existe
         if Usuario.query.filter_by(email=email).first():
             print("Error: Ese email ya está registrado.")
             return
