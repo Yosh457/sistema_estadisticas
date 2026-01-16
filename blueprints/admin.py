@@ -335,6 +335,88 @@ def toggle_dashboard(id):
     flash(f'Dashboard "{dashboard.titulo}" {estado}.', 'success')
     return redirect(url_for('admin.admin_dashboards'))
 
+# --- GESTIÓN DE GRUPOS ---
+
+@admin_bp.route('/grupos')
+@login_required
+@admin_required
+def admin_grupos():
+    grupos = Grupo.query.order_by(Grupo.orden).all()
+    return render_template('admin_grupos.html', grupos=grupos)
+
+@admin_bp.route('/crear_grupo', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def crear_grupo():
+    if request.method == 'POST':
+        nombre = request.form.get('nombre')
+        orden = request.form.get('orden')
+        
+        # Manejo de Imagen
+        imagen_filename = None
+        if 'imagen' in request.files:
+            file = request.files['imagen']
+            if file and file.filename != '':
+                filename = secure_filename(file.filename)
+                # Guardamos en static
+                file.save(os.path.join(current_app.root_path, 'static', filename))
+                imagen_filename = filename
+
+        nuevo_grupo = Grupo(
+            nombre=nombre,
+            orden=orden,
+            imagen=imagen_filename,
+            activo=True
+        )
+        
+        db.session.add(nuevo_grupo)
+        db.session.commit()
+        
+        registrar_log("Creación Grupo", f"Creó el grupo '{nombre}'")
+        flash('Grupo creado con éxito.', 'success')
+        return redirect(url_for('admin.admin_grupos'))
+
+    return render_template('crear_editar_grupo.html', grupo=None)
+
+@admin_bp.route('/editar_grupo/<int:id>', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def editar_grupo(id):
+    grupo = Grupo.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        grupo.nombre = request.form.get('nombre')
+        grupo.orden = request.form.get('orden')
+        
+        # Manejo de Imagen (Solo si suben una nueva)
+        if 'imagen' in request.files:
+            file = request.files['imagen']
+            if file and file.filename != '':
+                filename = secure_filename(file.filename)
+                file.save(os.path.join(current_app.root_path, 'static', filename))
+                grupo.imagen = filename
+
+        db.session.commit()
+        registrar_log("Edición Grupo", f"Editó el grupo '{grupo.nombre}'")
+        flash('Grupo actualizado.', 'success')
+        return redirect(url_for('admin.admin_grupos'))
+
+    return render_template('crear_editar_grupo.html', grupo=grupo)
+
+@admin_bp.route('/toggle_grupo/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def toggle_grupo(id):
+    grupo = Grupo.query.get_or_404(id)
+    grupo.activo = not grupo.activo
+    db.session.commit()
+    
+    estado = "activado" if grupo.activo else "desactivado"
+    registrar_log("Cambio Estado Grupo", f"El grupo '{grupo.nombre}' fue {estado}.")
+    
+    flash(f'Grupo "{grupo.nombre}" {estado}.', 'success')
+    return redirect(url_for('admin.admin_grupos'))
+
 @admin_bp.route('/exportar_logs_xlsx')
 @login_required
 @admin_required

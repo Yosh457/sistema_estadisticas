@@ -1,5 +1,10 @@
 # 📊 Sistema de Paneles de Estadísticas - Salud MAHO
 
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
+![Flask](https://img.shields.io/badge/Flask-3.1.2-green.svg)
+![Database](https://img.shields.io/badge/Database-MySQL-blue.svg)
+![ORM](https://img.shields.io/badge/ORM-SQLAlchemy-red.svg)
+
 Sistema web desarrollado para la **Unidad de TICs del Departamento de Salud de la Municipalidad de Alto Hospicio**. Permite la centralización, visualización y gestión segura de paneles de datos (PowerBI) para la toma de decisiones.
 
 ## 🚀 Características Principales
