@@ -11,6 +11,7 @@
             <p class="text-gray-500">Administra el acceso al sistema de estadísticas.</p>
         </div>
         <div class="flex gap-2">
+            <a href="{{ url_for('admin.admin_grupos') }}" class="btn btn-info text-white bg-teal-600 hover:bg-teal-700 border-teal-600">Gestión Grupos</a>
             <a href="{{ url_for('admin.admin_dashboards') }}" class="btn btn-info text-white bg-purple-600 hover:bg-purple-700 border-purple-600">Gestión Paneles</a>
             <a href="{{ url_for('admin.ver_logs') }}" class="btn btn-secondary">Ver Logs</a>
             <a href="{{ url_for('admin.crear_usuario') }}" class="btn btn-primary">Crear Usuario</a>

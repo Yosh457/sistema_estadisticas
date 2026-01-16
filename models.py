@@ -79,6 +79,7 @@ class Grupo(db.Model):
     nombre = db.Column(db.String(100), nullable=False)
     imagen = db.Column(db.String(255)) 
     orden = db.Column(db.Integer, default=0)
+    activo = db.Column(db.Boolean, default=True)
     
     # Relación para acceder a los dashboards de este grupo
     dashboards = db.relationship('Dashboard', back_populates='grupo')
